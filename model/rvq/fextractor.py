@@ -158,6 +158,8 @@ class SincBlock(nn.Module):
     
     def forward(self, x):
         x = self.sinc_conv(x)
+        
+
         x = self.log_compression(x)
         x = self.batch_norm(x)
         x = self.pool(x)
@@ -185,27 +187,32 @@ class FeatureExtractor(nn.Module):
     def __init__(self):
         super().__init__()
         self.sinc_block = SincBlock(128, 52)
+
         self.d_conv_1 = DConvBlock(128, 128, 25, 2, False)
         self.pool = nn.MaxPool1d(2, 2)
         self.dropout = nn.Dropout1d(0.1)
         self.d_conv_2 = DConvBlock(128, 256, 9, 1, False)
         self.d_conv_3 = DConvBlock(256, 256, 9, 1, False)
         #self.d_conv_4 = DConvBlock(256, 256, 9, 1, False)
-        self.gpool = nn.AdaptiveAvgPool1d(1)
-        self.ff = nn.Linear(256, 35)
+        #self.gpool = nn.AdaptiveAvgPool1d(1)
+        #self.ff = nn.Linear(256, 35)
     def forward(self, x):
         x = self.sinc_block(x)
         x = self.d_conv_1(x)
+        print(x.shape)
+
         x = self.pool(x)
         x = self.dropout(x)
+        
         x = self.d_conv_2(x)
         x = self.pool(x)
+        
         x = self.d_conv_3(x)
         x = self.pool(x)
         #x = self.d_conv_4(x)
         #x = self.pool(x)
-        x = self.gpool(x).squeeze(-1)
-        x = self.ff(x)
+        #x = self.gpool(x).squeeze(-1)
+        #x = self.ff(x)
         return x
         
 #class FeatureExtractor(nn.Module):
@@ -252,11 +259,71 @@ class FeatureExtractor(nn.Module):
 #        x = self.gpool(x).squeeze(-1)
 #        x = self.ff(x)
 #        return x
+class TDConvBlock(nn.Module):
+    def __init__(self, i, c, k, s, dropout = True):
+        super().__init__()
+        self.pointwise_reverse = nn.ConvTranspose1d(i, i, kernel_size=1, stride=1)
+        self.depthwise_reverse = nn.ConvTranspose1d(i, c, kernel_size=k, 
+                                                    padding=k//2, stride=s, groups=c)
+        self.batch_norm = nn.BatchNorm1d(c)
+        self.activation = nn.LeakyReLU()
+        self.is_dropout = dropout
+        self.dropout_layer = nn.Dropout1d(0.15)
     
+    def forward(self, x):
+        print(f"Input: {x.shape}")
+        x = self.pointwise_reverse(x)
+        print(f"Output: {x.shape}")
+        x = self.depthwise_reverse(x)
+        x = self.activation(x)
+        x = self.batch_norm(x)
+        if self.is_dropout:
+            x = self.dropout_layer(x)
+        return x
+    
+class Decoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # Reverse of FeatureExtractor in terms of channels and downsampling
+        # Suppose feature extractor output channels=256 and temporal length reduced by 8 (due to 3 MaxPool with stride=2)
+        
+        self.deconv1 = nn.ConvTranspose1d(256, 128, kernel_size=4, stride=2, padding=1)  # upsample x2
+        self.bn1 = nn.BatchNorm1d(128)
+        self.act1 = nn.LeakyReLU()
+        
+        self.deconv2 = nn.ConvTranspose1d(128, 128, kernel_size=4, stride=2, padding=1)  # upsample x2
+        self.bn2 = nn.BatchNorm1d(128)
+        self.act2 = nn.LeakyReLU()
+        
+        self.deconv3 = nn.ConvTranspose1d(128, 1, kernel_size=4, stride=2, padding=1)   # upsample x2 to original length
+        # No batch norm or activation here assuming output waveform
+        
+    def forward(self, x):
+        x = self.deconv1(x)
+        x = self.bn1(x)
+        x = self.act1(x)
+        
+
+        
+        x = self.deconv2(x)
+        x = self.bn2(x)
+        x = self.act2(x)
+        print(x.shape)
+        x = self.deconv3(x)
+        # output shape: (batch, 1, original_length)
+        print(x.shape)
+        return x
+
+
+        return x
 if __name__ == "__main__":
     x = torch.rand(4, 1, 160000)
     model = FeatureExtractor()
     y = model(x)
+
+    decoder = Decoder()
+    z = decoder(y)
+    #print(z.shape)
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(y.shape)
+    #print(y.shape)
     print(f"Total parameters: {pytorch_total_params}")

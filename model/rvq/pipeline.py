@@ -2,12 +2,13 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, Subset
 from torchaudio.datasets import SPEECHCOMMANDS
-from sn import FeatureExtractor
+from rvq import RVQ_VAE
 from train import train_step
 import os
 
 class SpeechCommandsModified(Dataset):
     def __init__(self, root = "../../dataset/data"):
+        os.makedirs(root, exist_ok=True)
         self.dataset = SPEECHCOMMANDS(root=root, download=False)
         self.labels = [
             "backward", "bed", "bird", "cat", "dog", "down", "eight", "five",
@@ -43,7 +44,7 @@ if __name__ == "__main__":
     device = "cuda"
     batch_size = 16
     dataset = SpeechCommandsModified()
-    model = FeatureExtractor().to(device)
+    model = RVQ_VAE(latent_dim=256).to(device)
 
     train_size = int(len(dataset) * 0.8)
     val_size = int(len(dataset) - train_size)

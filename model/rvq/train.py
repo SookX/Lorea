@@ -39,11 +39,11 @@ def train_step(
         epoch_loss = 0.0
         all_preds, all_labels = [], []
 
-        for wf, label in train_dataloader:
+        for wf, label in tqdm(train_dataloader, desc=f"Epoch {epoch+1}/{epochs} - Training"):
             wf, label = wf.to(device), label.to(device)
 
-            logits = model(wf)
-            loss = loss_fn(logits, label)
+            logits, codebook_losses, comitment_losses = model(wf)
+            loss = loss_fn(logits, label) + codebook_losses + comitment_losses
 
             optimizer.zero_grad()
             loss.backward()
@@ -64,11 +64,11 @@ def train_step(
         val_preds, val_labels = [], []
 
         with torch.no_grad():
-            for wf, label in val_dataloader:
+            for wf, label in tqdm(val_dataloader):
                 wf, label = wf.to(device), label.to(device)
 
-                logits = model(wf)
-                loss = loss_fn(logits, label)
+                logits, codebook_losses, comitment_losses = model(wf)
+                loss = loss_fn(logits, label) + codebook_losses + comitment_losses
                 val_loss += loss.item()
 
                 preds = torch.argmax(logits, dim=1)

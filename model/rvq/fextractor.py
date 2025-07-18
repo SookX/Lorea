@@ -199,8 +199,6 @@ class FeatureExtractor(nn.Module):
     def forward(self, x):
         x = self.sinc_block(x)
         x = self.d_conv_1(x)
-        print(x.shape)
-
         x = self.pool(x)
         x = self.dropout(x)
         
@@ -284,36 +282,26 @@ class TDConvBlock(nn.Module):
 class Decoder(nn.Module):
     def __init__(self):
         super().__init__()
-        # Reverse of FeatureExtractor in terms of channels and downsampling
-        # Suppose feature extractor output channels=256 and temporal length reduced by 8 (due to 3 MaxPool with stride=2)
-        
-        self.deconv1 = nn.ConvTranspose1d(256, 128, kernel_size=4, stride=2, padding=1)  # upsample x2
-        self.bn1 = nn.BatchNorm1d(128)
-        self.act1 = nn.LeakyReLU()
-        
-        self.deconv2 = nn.ConvTranspose1d(128, 128, kernel_size=4, stride=2, padding=1)  # upsample x2
-        self.bn2 = nn.BatchNorm1d(128)
-        self.act2 = nn.LeakyReLU()
-        
-        self.deconv3 = nn.ConvTranspose1d(128, 1, kernel_size=4, stride=2, padding=1)   # upsample x2 to original length
-        # No batch norm or activation here assuming output waveform
+        self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
+        self.td_conv_1 = TDConvBlock(256, 256, 9, 1)
+        self.td_conv_2 = TDConvBlock(256, 128, 9, 1)
+        self.td_conv_3 = TDConvBlock(128, 128, 25, 2, False)
+        self.dropout = nn.Dropout1d(0.1)
+        self.final_proj = nn.Conv1d(128, 1, kernel_size=52, stride=1, dilation=1, padding=0)
         
     def forward(self, x):
-        x = self.deconv1(x)
-        x = self.bn1(x)
-        x = self.act1(x)
+        x = self.upsample(x)
+        x = self.td_conv_1(x)
         
 
-        
-        x = self.deconv2(x)
-        x = self.bn2(x)
-        x = self.act2(x)
-        print(x.shape)
-        x = self.deconv3(x)
-        # output shape: (batch, 1, original_length)
-        print(x.shape)
-        return x
+        x = self.upsample(x)
+        x = self.td_conv_2(x)
+        x = self.dropout(x)
+        x = self.upsample(x)
+        x = self.td_conv_3(x)
 
+        x = self.final_proj(x)
+        x = self.upsample(x)
 
         return x
 if __name__ == "__main__":

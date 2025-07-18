@@ -193,25 +193,32 @@ class FeatureExtractor(nn.Module):
         self.dropout = nn.Dropout1d(0.1)
         self.d_conv_2 = DConvBlock(128, 256, 9, 1, False)
         self.d_conv_3 = DConvBlock(256, 256, 9, 1, False)
+        
         #self.d_conv_4 = DConvBlock(256, 256, 9, 1, False)
         #self.gpool = nn.AdaptiveAvgPool1d(1)
         #self.ff = nn.Linear(256, 35)
     def forward(self, x):
+        skip_connections = []
+        skip_connections.append(x)
         x = self.sinc_block(x)
+        skip_connections.append(x)
         x = self.d_conv_1(x)
         x = self.pool(x)
         x = self.dropout(x)
+        skip_connections.append(x)
         
         x = self.d_conv_2(x)
         x = self.pool(x)
+        skip_connections.append(x)
         
         x = self.d_conv_3(x)
         x = self.pool(x)
+        skip_connections.append(x)
         #x = self.d_conv_4(x)
         #x = self.pool(x)
         #x = self.gpool(x).squeeze(-1)
         #x = self.ff(x)
-        return x
+        return x, skip_connections
         
 #class FeatureExtractor(nn.Module):
 #    def __init__(self, in_channels, out_channels):
@@ -269,9 +276,7 @@ class TDConvBlock(nn.Module):
         self.dropout_layer = nn.Dropout1d(0.15)
     
     def forward(self, x):
-        print(f"Input: {x.shape}")
         x = self.pointwise_reverse(x)
-        print(f"Output: {x.shape}")
         x = self.depthwise_reverse(x)
         x = self.activation(x)
         x = self.batch_norm(x)
@@ -289,20 +294,33 @@ class Decoder(nn.Module):
         self.dropout = nn.Dropout1d(0.1)
         self.final_proj = nn.Conv1d(128, 1, kernel_size=52, stride=1, dilation=1, padding=0)
         
-    def forward(self, x):
+    def skip_connection(self, x, skip_connection):
+
+        diff = skip_connection.shape[-1] - x.shape[-1]
+
+        if diff > 0:
+            x = F.pad(x, (0, diff))
+        elif diff < 0:
+            x = x[..., :skip_connection.shape[-1]]
+
+        return x + skip_connection
+
+    def forward(self, x, skip_connections):
+        skip_connections = skip_connections[::-1]
+        x = self.skip_connection(x, skip_connections[0])
         x = self.upsample(x)
         x = self.td_conv_1(x)
-        
-
+        x = self.skip_connection(x, skip_connections[1])
         x = self.upsample(x)
         x = self.td_conv_2(x)
+        x = self.skip_connection(x, skip_connections[2])
         x = self.dropout(x)
         x = self.upsample(x)
         x = self.td_conv_3(x)
-
-        x = self.final_proj(x)
+        x = self.skip_connection(x, skip_connections[3])
         x = self.upsample(x)
-
+        x = self.final_proj(x)
+        x = self.skip_connection(x, skip_connections[4])
         return x
 if __name__ == "__main__":
     x = torch.rand(4, 1, 160000)

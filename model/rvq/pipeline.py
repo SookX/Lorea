@@ -5,6 +5,7 @@ from torchaudio.datasets import SPEECHCOMMANDS
 from rvq import RVQ_VAE
 from train import train_step
 import os
+from tqdm import tqdm
 
 class SpeechCommandsModified(Dataset):
     def __init__(self, root = "../../dataset/data"):
@@ -26,6 +27,9 @@ class SpeechCommandsModified(Dataset):
         wf, sr, label, _, _ = self.dataset[index]
         label = self.label_to_index[label]
         return wf, sr, label
+
+    
+
     
 def collate_fn(batch):
     waveforms = [item[0] for item in batch]
@@ -42,18 +46,39 @@ def collate_fn(batch):
 
 if __name__ == "__main__":
     device = "cuda"
-    batch_size = 16
+    batch_size = 4
     dataset = SpeechCommandsModified()
-    model = RVQ_VAE(latent_dim=256).to(device)
+
+
 
     train_size = int(len(dataset) * 0.8)
-    val_size = int(len(dataset) - train_size)
-    train_set, val_set = torch.utils.data.random_split(dataset, [train_size,val_size])
+    val_size = len(dataset) - train_size
+    train_set, val_set = torch.utils.data.random_split(dataset, [train_size, val_size])
+
+    train_dataloader = DataLoader(
+    train_set, 
+    batch_size=batch_size, 
+    shuffle=True, 
+    collate_fn=collate_fn, 
+    num_workers=4,  # increase to leverage multiprocessing for data loading
+    pin_memory=True,  # speeds up transfer of data to GPU
+    drop_last=True   # drop last incomplete batch (usually good for training)
+)
+
+    val_dataloader = DataLoader(
+        val_set, 
+        batch_size=batch_size, 
+        shuffle=False, 
+        collate_fn=collate_fn, 
+        num_workers=4, 
+        pin_memory=True,
+        drop_last=False  # usually want to evaluate on all data
+    )
 
 
-    train_dataloader = DataLoader(train_set, batch_size, True, collate_fn=collate_fn)
-    val_dataloader = DataLoader(val_set, batch_size, False, collate_fn=collate_fn)
+    model = RVQ_VAE(latent_dim=256).to(device)
 
     loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), 3e-4)
+
     train_step(model, train_dataloader, val_dataloader, 50, loss_fn, optimizer, device)

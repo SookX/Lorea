@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from fextractor import FeatureExtractor
+from fextractor import FeatureExtractor, Decoder
 
 class VectorQuantizer(nn.Module):
     def __init__(self, codebook_size=1024, latent_dim=2):
@@ -55,6 +55,7 @@ class RVQ_VAE(nn.Module):
         self.latent_dim = latent_dim
         self.codebook_size = codebook_size
         self.enc = FeatureExtractor()
+        self.dec = Decoder()
         self.rvq = nn.ModuleList(
             [
                 VectorQuantizer(codebook_size, latent_dim) for _ in range(num_codebooks)
@@ -98,8 +99,11 @@ class RVQ_VAE(nn.Module):
     def forward_enc(self, x):
         return self.enc(x)
     
+    def forward_dec(self, x, skip_connections):
+        return self.dec(x, skip_connections)
+    
     def forward(self, x):
-        latents = self.forward_enc(x)          # [B, D, T]
+        latents, skip_connections = self.forward_enc(x)          # [B, D, T]
         latents = latents.permute(0, 2, 1)     # [B, T, D]
         B, T, D = latents.shape
 
@@ -108,12 +112,13 @@ class RVQ_VAE(nn.Module):
 
         final_quantized = final_quantized.reshape(B, T, D)
         final_quantized = final_quantized.permute(0, 2, 1)
-
+        
+        decoded = self.forward_dec(final_quantized, skip_connections)
 
         output = self.gpool(final_quantized).squeeze(-1)
         output = self.ff(output)
 
-        return output, codebook_losses, comitment_losses
+        return output, decoded, codebook_losses, comitment_losses
 
 
     
@@ -123,4 +128,4 @@ if __name__ == "__main__":
     output, codebook_losses, comitment_losses = model(x)
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Total parameters: {pytorch_total_params}")
-    print(output.shape)
+    #print(output.shape)

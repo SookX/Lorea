@@ -1,10 +1,12 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+import torch.cuda.amp as amp
 import logging
 from tqdm import tqdm
 from sklearn.metrics import accuracy_score
 import time
+from torch.profiler import profile, record_function, ProfilerActivity
 
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 
@@ -41,18 +43,25 @@ def train_step(
 
         for wf, label in tqdm(train_dataloader, desc=f"Epoch {epoch+1}/{epochs} - Training"):
             wf, label = wf.to(device), label.to(device)
+            with torch.amp.autocast(device):
+                logits, decoded, codebook_losses, comitment_losses = model(wf)
+                rec_loss = torch.mean((wf-decoded)**2)
+                λ_cls = 1.0       # main priority
+                λ_rec = 0.1       # smaller weight for reconstruction
+                λ_vq = 0.1        # small weight for codebook + commitment losses
 
-            logits, codebook_losses, comitment_losses = model(wf)
-            loss = loss_fn(logits, label) + codebook_losses + comitment_losses
+                loss = λ_cls * loss_fn(logits, label) + λ_rec * rec_loss + λ_vq * (codebook_losses + comitment_losses)
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
 
-            epoch_loss += loss.item()
-            preds = torch.argmax(logits, dim=1)
-            all_preds.extend(preds.detach().cpu().tolist())
-            all_labels.extend(label.detach().cpu().tolist())
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                torch.cuda.empty_cache()
+
+                epoch_loss += loss.item()
+                preds = torch.argmax(logits, dim=1)
+                all_preds.extend(preds.detach().cpu().tolist())
+                all_labels.extend(label.detach().cpu().tolist())
 
         train_acc = accuracy_score(all_labels, all_preds)
         train_loss = epoch_loss / len(train_dataloader)
@@ -67,8 +76,13 @@ def train_step(
             for wf, label in tqdm(val_dataloader):
                 wf, label = wf.to(device), label.to(device)
 
-                logits, codebook_losses, comitment_losses = model(wf)
-                loss = loss_fn(logits, label) + codebook_losses + comitment_losses
+                logits, decoded, codebook_losses, comitment_losses = model(wf)
+                rec_loss = torch.mean((wf-decoded)**2)
+                λ_cls = 1.0       # main priority
+                λ_rec = 0.1       # smaller weight for reconstruction
+                λ_vq = 0.1        # small weight for codebook + commitment losses
+
+                loss = λ_cls * loss_fn(logits, label) + λ_rec * rec_loss + λ_vq * (codebook_losses + comitment_losses)
                 val_loss += loss.item()
 
                 preds = torch.argmax(logits, dim=1)

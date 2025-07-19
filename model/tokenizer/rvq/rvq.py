@@ -5,7 +5,7 @@ from tokenizer.feature_extractor.decoder import Decoder
 from tokenizer.components.vq import VectorQuantizer
 
 class RVQ_VAE(nn.Module):
-    def __init__(self, latent_dim, codebook_size = 512, num_codebooks = 3):
+    def __init__(self, latent_dim, codebook_size = 256, num_codebooks = 3):
         super().__init__()
         self.latent_dim = latent_dim
         self.codebook_size = codebook_size

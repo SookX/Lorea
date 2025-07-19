@@ -1,15 +1,15 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from tokenizer.components import TDConvBlock
+from tokenizer.components.tds_conv import TDSConvBlock
 
 class Decoder(nn.Module):
     def __init__(self):
         super().__init__()
         self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
-        self.td_conv_1 = TDConvBlock(256, 256, 9, 1)
-        self.td_conv_2 = TDConvBlock(256, 128, 9, 1)
-        self.td_conv_3 = TDConvBlock(128, 128, 25, 2, False)
+        self.td_conv_1 = TDSConvBlock(256, 256, 9, 1)
+        self.td_conv_2 = TDSConvBlock(256, 128, 9, 1)
+        self.td_conv_3 = TDSConvBlock(128, 128, 25, 2, False)
         self.dropout = nn.Dropout1d(0.1)
         self.final_proj = nn.Conv1d(128, 1, kernel_size=52, stride=1, dilation=1, padding=0)
         

@@ -46,10 +46,9 @@ def train_step(
             with torch.amp.autocast(device):
                 logits, decoded, codebook_losses, comitment_losses = model(wf)
                 rec_loss = torch.mean((wf-decoded)**2)
-                λ_cls = 1.0       # main priority
-                λ_rec = 0.1       # smaller weight for reconstruction
-                λ_vq = 0.1        # small weight for codebook + commitment losses
-
+                λ_cls = 1.0       
+                λ_rec = 0.1       
+                λ_vq = 0.1        
                 loss = λ_cls * loss_fn(logits, label) + λ_rec * rec_loss + λ_vq * (codebook_losses + comitment_losses)
 
 
@@ -67,7 +66,6 @@ def train_step(
         train_loss = epoch_loss / len(train_dataloader)
         train_time = time.time() - start_time
 
-        # ---- VALIDATION STEP ----
         model.eval()
         val_loss = 0.0
         val_preds, val_labels = [], []
@@ -78,9 +76,9 @@ def train_step(
 
                 logits, decoded, codebook_losses, comitment_losses = model(wf)
                 rec_loss = torch.mean((wf-decoded)**2)
-                λ_cls = 1.0       # main priority
-                λ_rec = 0.1       # smaller weight for reconstruction
-                λ_vq = 0.1        # small weight for codebook + commitment losses
+                λ_cls = 1.0       
+                λ_rec = 0.1       
+                λ_vq = 0.1       
 
                 loss = λ_cls * loss_fn(logits, label) + λ_rec * rec_loss + λ_vq * (codebook_losses + comitment_losses)
                 val_loss += loss.item()
@@ -92,7 +90,6 @@ def train_step(
         val_acc = accuracy_score(val_labels, val_preds)
         val_loss /= len(val_dataloader)
 
-        # ---- LOGGING ----
         logging.info(
             f"Epoch [{epoch+1}/{epochs}] "
             f"| Train Loss: {train_loss:.4f} | Train Acc: {train_acc*100:.2f}% "

@@ -9,7 +9,6 @@ class RVQ_VAE(nn.Module):
         super().__init__()
         self.latent_dim = latent_dim
         self.codebook_size = codebook_size
-        self.enc = Encoder()
         # self.dec = Decoder()
         self.rvq = nn.ModuleList(
             [
@@ -18,6 +17,7 @@ class RVQ_VAE(nn.Module):
         )
         # self.gpool = nn.AdaptiveAvgPool1d(1)
         # self.ff = nn.Linear(256, 35)
+
 
     def quantize(self, z, return_code_idx_only = False):
         codebook_losses = 0
@@ -51,15 +51,13 @@ class RVQ_VAE(nn.Module):
         else:
             return final_quantized,code_index, codebook_losses, comitment_losses
 
-    def forward_enc(self, x):
-        return self.enc(x)
+    
     
     #def forward_dec(self, x, skip_connections):
     #    return self.dec(x, skip_connections)
     
     def forward(self, x):
-        latents = self.forward_enc(x)          # [B, D, T]
-        latents = latents.permute(0, 2, 1)     # [B, T, D]
+        latents = x.permute(0, 2, 1)     # [B, T, D]
         B, T, D = latents.shape
 
         latents_flat = latents.reshape(B * T, D)

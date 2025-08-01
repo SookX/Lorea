@@ -1,17 +1,15 @@
 import torch
 import torch.nn as nn
 from tokenizer.tokenizer import Tokenizer
-from pos_enc.pos_enc import PositionalEncoding
 
 class Lorea(nn.Module):
     def __init__(self, d_model = 256, latent_dim = 256, codebook_size = 256, num_codebooks = 3):
         super().__init__()
         self.tok = Tokenizer(d_model, latent_dim, codebook_size, num_codebooks)
-        self.pos_enc = PositionalEncoding()
+       
     
     def forward(self, x):
         x = self.tok(x)
-        x = self.pos_enc(x)
         return x
 
 if __name__ == '__main__':

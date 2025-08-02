@@ -1,21 +1,28 @@
 from torchaudio.datasets import LIBRISPEECH
 from torch.utils.data import Dataset, DataLoader
-from tokenizer import Tokenizer
+from tokenizer.tokenizer import GPT4Tokenizer
 import torch
 import matplotlib.pyplot as plt
 
+def dataset_to_corpus(dataset: Dataset):
+    corpus = ""
+    for i in range(len(dataset)):
+        corpus += dataset[i]["transcript"] + "."
+    with open("./tokenizer/corpus.txt", "w") as f:
+        f.write(corpus)
+
 class LibriSpeechReformated(Dataset):
-    def __init__(self, path, url = 'train-clean-100', download = False):
+    def __init__(self, path, url = 'train-clean-100', download = True):
         super().__init__()
         self.dataset = LIBRISPEECH(path, url=url, download=download) 
-        self.tokenizer = Tokenizer()
+        #self.tokenizer = Tokenizer()
     
     def __len__(self):
         return len(self.dataset)
     
     def __getitem__(self, index):
         waveform, _, transcript, _, _, _ = self.dataset[index]
-        transcript = self.tokenizer.encode(transcript)
+        #transcript = self.tokenizer.encode(transcript)
         return {
             "waveform": torch.tensor(waveform),
             "transcript": transcript
@@ -52,9 +59,10 @@ class Collator:
 
 if __name__ == "__main__":
     train_dataset = LibriSpeechReformated("./data")
-    collate_fn = Collator(train_dataset.tokenizer)
+    dataset_to_corpus(train_dataset)
+    #collate_fn = Collator(train_dataset.tokenizer)
 
-    data_loader = DataLoader(train_dataset, 4, True, collate_fn=collate_fn)
-    for sample in data_loader:
-        print(sample)
-        break
+    #data_loader = DataLoader(train_dataset, 4, True, collate_fn=collate_fn)
+    #for sample in data_loader:
+    #    print(sample)
+    #    break

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.functional as F
+import torch.nn.functional as F
 
 class Attention(nn.Module):
     def __init__(self, conifg):
@@ -43,3 +43,4 @@ class Attention(nn.Module):
             
         attention_out = attention_out.transpose(1, 2).flatten(2)
         attention_out = self.out_proj(attention_out)
+        return attention_out

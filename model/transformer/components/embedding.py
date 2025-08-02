@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from pos_enc import PositionalEncoding
+from transformer.components.pos_enc import PositionalEncoding
 
 class Embeddings(nn.Module):
     def __init__(self, config):

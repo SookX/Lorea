@@ -3,25 +3,43 @@ import torch.nn as nn
 import math
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, dropout = 0.1):
+
+    """
+    Sin/Cosine (non-learnable) encodings proposed in Attention is All You Need
+
+    Args:
+        max_len: Maximum number of tokens possible in a sequence
+        embed_dim: Embedding dimension of each token
+    """
+
+    def __init__(self, max_len, embed_dim, requires_grad=False):
         super().__init__()
-        self.dropout = nn.Dropout(dropout)
-    
+
+        self.max_len = max_len
+        self.embed_dim = embed_dim
+        self.requires_grad = requires_grad
+
+        self.encodings = self._build_positional_encodings()
+
+    def _build_positional_encodings(self):
+
+        encoding = torch.zeros(self.max_len, self.embed_dim, dtype=torch.float)
+        postion_idx = torch.arange(0, self.max_len, dtype=torch.float).reshape(-1,1)
+        embed_dim_skip_idx = torch.arange(0, self.embed_dim, step=2, dtype=torch.float)
+        
+        encoding[:, 0::2] = torch.sin(postion_idx / (10000 ** (embed_dim_skip_idx / self.embed_dim)))
+        encoding[:, 1::2] = torch.cos(postion_idx / (10000 ** (embed_dim_skip_idx / self.embed_dim)))
+
+        encoding = nn.Parameter(encoding, requires_grad=self.requires_grad)
+
+        return encoding
+
     def forward(self, x):
-        _, wave_length, d_model = x.shape
-        pe = torch.zeros(wave_length, d_model)
-        position = torch.arange(0, wave_length, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model)) 
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0) 
-        self.register_buffer('pe', pe)
-        x = x + (self.pe[:, :x.shape[1], :]).requires_grad_(False) 
-        return self.dropout(x)
-    
-if __name__ == "__main__":
-    x = torch.rand(4, 3100, 256)
-    pos = PositionalEncoding()
-    x = pos(x)
-    print(x.shape)
+
+        seq_len = x.shape[1]
+        encodings = self.encodings[:seq_len]
+
+        x = x + encodings
+
+        return x
 

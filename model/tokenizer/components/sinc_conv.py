@@ -135,20 +135,19 @@ class SincConv_fast(nn.Module):
                         padding=self.padding, dilation=self.dilation,
                          bias=None, groups=1) 
 
-    
+
 class SincBlock(nn.Module):
     def __init__(self, c, k):
         super().__init__()
         self.sinc_conv = SincConv_fast(c, k)
         self.batch_norm = nn.BatchNorm1d(c)
         self.pool = nn.MaxPool1d(2, 2)
+
     def log_compression(self, x):
         return torch.log(torch.abs(x) + 1)
-    
+     
     def forward(self, x):
         x = self.sinc_conv(x)
-        
-
         x = self.log_compression(x)
         x = self.batch_norm(x)
         x = self.pool(x)

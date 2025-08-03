@@ -1,57 +1,39 @@
 from torchaudio.datasets import LIBRISPEECH
-from torch.utils.data import Dataset, DataLoader
-from tokenizer.tokenizer import GPT4Tokenizer
+from torch.utils.data import Dataset
+from dataset.tokenizer.tokenizer import GPT4Tokenizer
 import torch
-import matplotlib.pyplot as plt
+from tqdm import tqdm
 
-def dataset_to_corpus(dataset: Dataset):
-    corpus = ""
-    for i in range(len(dataset)):
-        corpus += dataset[i]["transcript"] + "."
-    with open("./tokenizer/corpus.txt", "w") as f:
-        f.write(corpus)
+
+def dataset_to_corpus(dataset: Dataset, output_path="./tokenizer/corpus.txt"):
+    with open(output_path, "w", encoding="utf-8") as f:
+        for i in tqdm(range(len(dataset))):
+            line = dataset[i]["transcript"].strip()
+            if line:
+                f.write(line + "\n")
 
 class LibriSpeechReformated(Dataset):
     def __init__(self, path, url = 'train-clean-100', download = True):
         super().__init__()
         self.dataset = LIBRISPEECH(path, url=url, download=download) 
-        #self.tokenizer = Tokenizer()
+        self.tokenizer = GPT4Tokenizer()
+        self.tokenizer.load("./dataset/tokenizer/tokenizer.json")
+
     
     def __len__(self):
         return len(self.dataset)
     
     def __getitem__(self, index):
         waveform, _, transcript, _, _, _ = self.dataset[index]
-        #transcript = self.tokenizer.encode(transcript)
+        transcript_ids = self.tokenizer.encode(transcript.lower())
         return {
-            "waveform": torch.tensor(waveform),
-            "transcript": transcript
+            "waveform": waveform.clone().detach(),
+            "transcript": transcript.lower(),
+            "transcript_ids": torch.tensor(transcript_ids, dtype=torch.long)
         }
 
-class Collator:
-    def __init__(self, tokenizer):
-        self.pad_token = tokenizer.tokenizer.pad_token_id
 
-    def __call__(self, batch):
-        src_ids = [i["waveform"].squeeze(0) for i in batch] 
-        tgt_ids = [i["transcript"] for i in batch]
 
-        print(tgt_ids)
-        src_padded = torch.nn.utils.rnn.pad_sequence(src_ids, batch_first=True, padding_value=0.0)
-        tgt_padded = torch.nn.utils.rnn.pad_sequence(tgt_ids, batch_first=True, padding_value=self.pad_token)
-        
-        input_tgt = tgt_padded[:, :-1].clone()
-        output_tgt = tgt_padded[:, 1:].clone()
-
-        input_tgt_mask = (input_tgt != self.pad_token)
-        output_tgt[output_tgt == self.pad_token] = -100
-
-        return {
-            "src_input_ids": src_padded,
-            "tgt_input_ids": input_tgt,
-            "tgt_pad_mask": input_tgt_mask,
-            "tgt_outputs": output_tgt,
-        }
     
 # Dataset downloader
 #train_dataset = LIBRISPEECH("./data", url='train-clean-100', download=False) 
@@ -59,10 +41,11 @@ class Collator:
 
 if __name__ == "__main__":
     train_dataset = LibriSpeechReformated("./data")
-    dataset_to_corpus(train_dataset)
-    #collate_fn = Collator(train_dataset.tokenizer)
-
-    #data_loader = DataLoader(train_dataset, 4, True, collate_fn=collate_fn)
+    #print(train_dataset[0])
+    #dataset_to_corpus(train_dataset)
+   #collate_fn = Collator(train_dataset.tokenizer)
+#
+    #data_loader = DataLoader(train_dataset, 1, True, collate_fn=collate_fn)
     #for sample in data_loader:
     #    print(sample)
     #    break

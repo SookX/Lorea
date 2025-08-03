@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from tokenizer.components.tds_conv import TDSConvBlock
+from model.tokenizer.components.tds_conv import TDSConvBlock
 
 class Decoder(nn.Module):
     def __init__(self):

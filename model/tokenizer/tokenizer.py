@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from tokenizer.feature_extractor.encoder import Encoder
-from tokenizer.rvq.rvq import RVQ_VAE
+from model.tokenizer.feature_extractor.encoder import Encoder
+from model.tokenizer.rvq.rvq import RVQ_VAE
 
 
 class Tokenizer(nn.Module):

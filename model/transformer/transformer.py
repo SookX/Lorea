@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
-from transformer.components.embedding import Embeddings
-from transformer.encoder.encoder import TransformerEncoder
-from transformer.decoder.decoder import TransformerDecoder
+from model.transformer.components.embedding import Embeddings
+from model.transformer.encoder.encoder import TransformerEncoder
+from model.transformer.decoder.decoder import TransformerDecoder
 
 
 class Transformer(nn.Module):

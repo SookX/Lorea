@@ -1,6 +1,6 @@
 import regex as re
 import json
-import os
+from tqdm import tqdm
 
 class GPT4Tokenizer:
     def __init__(self):
@@ -16,6 +16,7 @@ class GPT4Tokenizer:
 
         data = {
             "vocab_size": self.vocab_size,
+            "special_tokens": self.special_tokens,
             "merges": merges_str_keys
         }
         with open(path, "w", encoding="utf-8") as f:
@@ -26,12 +27,13 @@ class GPT4Tokenizer:
             data = json.load(f)
         
         self.vocab_size = data["vocab_size"]
-        print("Hello")
         merges = {}
         for k, v in data["merges"].items():
             pair = tuple(int(x) for x in k.split(","))
             merges[pair] = v
         self.merges = merges
+        for k, v in data["special_tokens"].items():
+            self.special_tokens[k] = int(v)
 
 
 
@@ -69,7 +71,7 @@ class GPT4Tokenizer:
         
         num_merges = self.vocab_size - 260
 
-        for i in range(num_merges):
+        for i in tqdm(range(num_merges)):
             global_stats = {}
             for bite in tokenized:
                 stats = self.get_stats(bite)
@@ -81,7 +83,7 @@ class GPT4Tokenizer:
 
             pair = max(global_stats, key=global_stats.get)
             idx = 256 + i
-            print(f"Merging {pair} into a new token {idx}")
+            # print(f"Merging {pair} into a new token {idx}")
 
             for j in range(len(tokenized)):
                 tokenized[j] = self.merge(tokenized[j], pair, idx)
@@ -122,11 +124,16 @@ class GPT4Tokenizer:
 
 if __name__ == "__main__":
     tok = GPT4Tokenizer()
-    tok.fit("A corpus is a collection of texts or text extracts that have been put together to be used as a sample of a language or language variety. It consists of texts that have been produced in 'natural contexts' (published books, ordinary conversation, letters, newspapers, lectures etc), which means it mirrors natural language. A well-composed corpus can be used to answer questions about language use, such as:", vocab_size=270)
-    print(tok.decode(tok.encode("Hello World!"), False))
-    tok.save("tokenizer.json")
-    
+    with open("./corpus.txt", "r") as f:
+        corpus = f.read()
 
+    #corpus = """Add a dictionary of special tokens (eos, pad, cls, etc.) to the encoder and link them to class attributes. If special tokens are NOT in the vocabulary, they are added to it (indexed starting from the last index of the current vocabulary).
+    #            When adding new tokens to the vocabulary, you should make sure to also resize the token embedding matrix of the model so that its embedding matrix matches the tokenizer."""
+    #tok.fit(corpus, vocab_size=5000)
+    #print(tok.decode(tok.encode("Hello World!"), False))
+    #tok.save("tokenizer.json")
+    #
+#
     tok1 = GPT4Tokenizer()
     tok1.load("tokenizer.json")
-    print(tok1.vocab_size)
+    print(tok1.decode(tok1.encode("My name is Anton")))

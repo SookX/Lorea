@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
-from tokenizer.tokenizer import Tokenizer
-from config import TransformerConfig
-from transformer.transformer import Transformer
+from model.tokenizer.tokenizer import Tokenizer
+from model.config import TransformerConfig
+from model.transformer.transformer import Transformer
 
 class Lorea(nn.Module):
     def __init__(self, latent_dim = 256, codebook_size = 256, num_codebooks = 3):

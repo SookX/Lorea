@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from transformer.components.attention import Attention
-from transformer.components.feedforward import FeedForward
+from model.transformer.components.attention import Attention
+from model.transformer.components.feedforward import FeedForward
 
 
 class TransformerEncoder(nn.Module):

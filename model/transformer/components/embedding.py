@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from transformer.components.pos_enc import PositionalEncoding
+from model.transformer.components.pos_enc import PositionalEncoding
 
 class Embeddings(nn.Module):
     def __init__(self, config):
@@ -8,8 +8,8 @@ class Embeddings(nn.Module):
         self.src_embeddings = nn.Embedding(config.src_vocab_size, config.embedding_dim)
         self.tgt_embeddings = nn.Embedding(config.tgt_vocab_size, config.embedding_dim)
 
-        self.src_positional_encodings = PositionalEncoding(config.max_src_len, config.embedding_dim, config.learn_pos_embed)
-        self.tgt_positional_encodings = PositionalEncoding(config.max_tgt_len, config.embedding_dim, config.learn_pos_embed)
+        self.src_positional_encodings = PositionalEncoding(config.embedding_dim)
+        self.tgt_positional_encodings = PositionalEncoding(config.embedding_dim)
 
     def forward_src(self, input_ids):
         embeddings = self.src_embeddings(input_ids)

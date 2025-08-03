@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from tokenizer.components.ds_conv import DSConvBlock
-from tokenizer.components.sinc_conv import SincBlock
+from model.tokenizer.components.ds_conv import DSConvBlock
+from model.tokenizer.components.sinc_conv import SincBlock
 
 class Encoder(nn.Module):
     def __init__(self, return_skip_connections=False):

@@ -3,43 +3,33 @@ import torch.nn as nn
 import math
 
 class PositionalEncoding(nn.Module):
-
     """
-    Sin/Cosine (non-learnable) encodings proposed in Attention is All You Need
-
+    Sin/Cosine (non-learnable) encodings proposed in Attention is All You Need.
+    Dynamically computes positional encodings during the forward pass.
+    
     Args:
-        max_len: Maximum number of tokens possible in a sequence
         embed_dim: Embedding dimension of each token
     """
 
-    def __init__(self, max_len, embed_dim, requires_grad=False):
+    def __init__(self, embed_dim):
         super().__init__()
-
-        self.max_len = max_len
         self.embed_dim = embed_dim
-        self.requires_grad = requires_grad
-
-        self.encodings = self._build_positional_encodings()
-
-    def _build_positional_encodings(self):
-
-        encoding = torch.zeros(self.max_len, self.embed_dim, dtype=torch.float)
-        postion_idx = torch.arange(0, self.max_len, dtype=torch.float).reshape(-1,1)
-        embed_dim_skip_idx = torch.arange(0, self.embed_dim, step=2, dtype=torch.float)
-        
-        encoding[:, 0::2] = torch.sin(postion_idx / (10000 ** (embed_dim_skip_idx / self.embed_dim)))
-        encoding[:, 1::2] = torch.cos(postion_idx / (10000 ** (embed_dim_skip_idx / self.embed_dim)))
-
-        encoding = nn.Parameter(encoding, requires_grad=self.requires_grad)
-
-        return encoding
 
     def forward(self, x):
+        """
+        Args:
+            x: Tensor of shape (batch_size, seq_len, embed_dim)
+        Returns:
+            x + positional encodings of shape (batch_size, seq_len, embed_dim)
+        """
+        batch_size, seq_len, _ = x.size()
 
-        seq_len = x.shape[1]
-        encodings = self.encodings[:seq_len]
+        position = torch.arange(seq_len, dtype=torch.float32, device=x.device).unsqueeze(1)  
+        div_term = torch.exp(torch.arange(0, self.embed_dim, 2, dtype=torch.float32, device=x.device) *
+                             (-math.log(10000.0) / self.embed_dim))  
 
-        x = x + encodings
+        pe = torch.zeros(seq_len, self.embed_dim, device=x.device)
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
 
-        return x
-
+        return x + pe.unsqueeze(0)  

@@ -8,8 +8,8 @@ from dataset.collator import Collator
 from model.lorea import Lorea
 
 from train import train_step
-
-from utils import load_config, get_device, get_number_of_parameters
+from transformers import get_scheduler
+from utils import load_config, get_device, get_number_of_parameters, load_pretrained
 
 
 init(autoreset=True)  
@@ -44,8 +44,13 @@ def main():
 
     optimizer = torch.optim.AdamW(model.parameters(), LEARNING_RATE)
     loss_fn = nn.CrossEntropyLoss()
+    num_training_steps = (len(train_dataset) / BATCH_SIZE) * EPOCHS
+    scheduler = get_scheduler("cosine", optimizer=optimizer, num_warmup_steps=1500, num_training_steps=num_training_steps)
 
-    train_step(model, train_dataloader, val_dataloader, EPOCHS, loss_fn, optimizer, DEVICE)
+    checkpoint = load_pretrained(model, optimizer, scheduler, checkpoint_path="./checkpoints/lorea-asr-3/lorea-asr-3_epoch_15.pt")
+    
+
+    train_step(model, train_dataloader, val_dataloader, EPOCHS, loss_fn, optimizer, scheduler, DEVICE, CHECKPOINT_DIR, MODEL_NAME, start_epoch=checkpoint["epoch"])
 
 if __name__ == "__main__":
     main()

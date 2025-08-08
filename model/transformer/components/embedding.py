@@ -1,19 +1,19 @@
 import torch
 import torch.nn as nn
-from model.transformer.components.pos_enc import PositionalEncoding
+from model.transformer.components.pos_enc import PositionalEncoding, AudioPositionalEncoding
 
 class Embeddings(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.src_embeddings = nn.Embedding(config.src_vocab_size, config.embedding_dim)
+        #self.src_embeddings = nn.Embedding(config.src_vocab_size, config.embedding_dim)
         self.tgt_embeddings = nn.Embedding(config.tgt_vocab_size, config.embedding_dim)
 
-        self.src_positional_encodings = PositionalEncoding(config.embedding_dim)
+        self.src_positional_encodings = AudioPositionalEncoding(config.embedding_dim)
         self.tgt_positional_encodings = PositionalEncoding(config.embedding_dim)
 
     def forward_src(self, input_ids):
-        embeddings = self.src_embeddings(input_ids)
-        embeddings = self.src_positional_encodings(embeddings)
+        #embeddings = self.src_embeddings(input_ids)
+        embeddings = self.src_positional_encodings(input_ids)
         
         return embeddings
     

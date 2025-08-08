@@ -10,6 +10,8 @@ from torch.profiler import profile, record_function, ProfilerActivity
 from sklearn.metrics import accuracy_score
 import jiwer
 import random
+import os
+from colorama import Fore, Style
 
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 
@@ -20,7 +22,11 @@ def train_step(
     epochs: int,
     loss_fn: nn.Module,
     optimizer: torch.optim.Optimizer,
-    device="cpu"
+    scheduler,
+    device="cpu",
+    checkpoint_dir = None,
+    model_name = None,
+    start_epoch = 0
 ) -> None:
     """
     Trains a PyTorch model and evaluates on validation set after each epoch.
@@ -38,9 +44,9 @@ def train_step(
     logging.info("Initializing model training...\n")
 
     model.train()
-    torch.autograd.set_detect_anomaly(True)
+    #torch.autograd.set_detect_anomaly(True)
 
-    for epoch in tqdm(range(epochs), desc="Epochs"):
+    for epoch in tqdm(range(start_epoch, epochs), desc="Epochs"):
         start_time = time.time()
         total_loss = 0.0
 
@@ -51,13 +57,13 @@ def train_step(
             tgt_input_ids = batch["tgt_input_ids"].to(device)
             tgt_pad_mask = batch["tgt_pad_mask"].to(device)
             tgt_outputs = batch["tgt_outputs"].to(device)
-
+            
             with torch.amp.autocast(device.type):
 
                 logits = model(src_input_ids, tgt_input_ids, tgt_pad_mask)
 
-                logits=logits.flatten(0, 1)
-                tgt_outputs=tgt_outputs.flatten()
+                logits = logits.reshape(-1, logits.size(-1))
+                tgt_outputs = tgt_outputs.reshape(-1)
 
                 loss = loss_fn(logits, tgt_outputs)
                 preds = logits.argmax(dim=-1).cpu().numpy()
@@ -71,9 +77,10 @@ def train_step(
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            scheduler.step()
 
             total_loss += loss.item()
-            avg_loss = total_loss / (i + 1)
+            #avg_loss = total_loss / (i + 1)
             progress_bar.set_postfix(loss=loss.item(), accuracy=f"{accuracy*100:.2f}%")
 
             if i % 32 == 0:
@@ -126,4 +133,16 @@ def train_step(
         f"Epoch {epoch+1}/{epochs} - "
         f"Train Loss: {avg_train_loss:.4f} - "
         f"Time: {elapsed:.2f}s"
-            )   
+        )
+        path = os.path.join(checkpoint_dir, model_name)
+        os.makedirs(path, exist_ok=True)
+        checkpoint_path = os.path.join(path, f"{model_name}_epoch_{epoch+1}.pt")
+        torch.save({
+            'epoch': epoch + 1,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'scheduler_state_dict': scheduler.state_dict(),
+            'train_loss': avg_train_loss,
+ #           'val_loss': avg_val_loss,
+        }, checkpoint_path)   
+        print(f"{Fore.GREEN}[CHECKPOINT]{Style.RESET_ALL} Saved model at: {Fore.CYAN}{checkpoint_path}{Style.RESET_ALL}")

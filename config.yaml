@@ -1,10 +1,10 @@
 model:
-  model_name: "lorea-asr-1" 
+  model_name: "lorea-asr-3" 
 
 training:
-  epochs: 5
-  batch_size: 8
-  learning_rate: 3e-4
+  epochs: 80
+  batch_size: 4
+  learning_rate: 1e-4
 
 logging:
   save_checkpoint_every: 1 

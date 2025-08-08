@@ -23,11 +23,12 @@ class TransformerEncoder(nn.Module):
         self.final_layer_norm = nn.LayerNorm(config.embedding_dim)
 
     def forward(self, x, attention_mask = None):
-       
+    
        x = self.encoder_attention(x, attention_mask = attention_mask)
        x = x + self.dropout(x)
        x = self.layer_norm(x)
 
        x = x + self.feed_forward(x)
        x = self.final_layer_norm(x)
+       
        return x

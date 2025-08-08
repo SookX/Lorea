@@ -123,17 +123,16 @@ class GPT4Tokenizer:
             return tokens_bytes.decode("utf-8", errors="replace")
 
 if __name__ == "__main__":
-    tok = GPT4Tokenizer()
-    with open("./corpus.txt", "r") as f:
-        corpus = f.read()
+    #tok = GPT4Tokenizer()
+    #with open("./corpus.txt", "r") as f:
+    #    corpus = f.read()
 
     #corpus = """Add a dictionary of special tokens (eos, pad, cls, etc.) to the encoder and link them to class attributes. If special tokens are NOT in the vocabulary, they are added to it (indexed starting from the last index of the current vocabulary).
     #            When adding new tokens to the vocabulary, you should make sure to also resize the token embedding matrix of the model so that its embedding matrix matches the tokenizer."""
-    #tok.fit(corpus, vocab_size=5000)
+    #tok.fit(corpus, vocab_size=15000)
     #print(tok.decode(tok.encode("Hello World!"), False))
     #tok.save("tokenizer.json")
     #
 #
     tok1 = GPT4Tokenizer()
     tok1.load("tokenizer.json")
-    print(tok1.decode(tok1.encode("My name is Anton")))

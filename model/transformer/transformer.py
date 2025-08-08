@@ -19,7 +19,7 @@ class Transformer(nn.Module):
         self.head = nn.Linear(config.embedding_dim, config.tgt_vocab_size)
     
     def forward(self, src_ids, tgt_ids, tgt_mask = None):
-        src_embeddings = self.embeddings.forward_src(src_ids)
+        src_embeddings = self.embeddings.forward_src(src_ids).permute(0, 2, 1)
         tgt_embeddings = self.embeddings.forward_tgt(tgt_ids)
 
         for layer in self.encoder:

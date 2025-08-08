@@ -19,37 +19,41 @@ class RVQ_VAE(nn.Module):
         # self.ff = nn.Linear(256, 35)
 
 
-    def quantize(self, z, return_code_idx_only = False):
+    def quantize(self, z, return_code_idx_only=False):
+        z_detached = z.detach()
         codebook_losses = 0
-        comitment_losses = 0
+        commitment_losses = 0
+        n_elements = 0
 
         quantized_codes = []
         code_index = []
-
         final_quantized = torch.zeros_like(z)
 
         for quantizer in self.rvq:
             codes, code_idx = quantizer(z)
             code_index.append(code_idx)
 
-            codebook_loss = torch.mean((codes - z.detach())**2)
-            comitment_loss = torch.mean((codes.detach() - z) ** 2)
+            mse = (codes - z_detached).pow(2)
+            mse_commit = (codes.detach() - z).pow(2)
 
-            codebook_losses += codebook_loss
-            comitment_losses += comitment_loss
- 
+            codebook_losses += mse.sum()
+            commitment_losses += mse_commit.sum()
+            n_elements += mse.numel()
+
             codes = z + (codes - z).detach()
-
-            final_quantized = final_quantized + codes
+            final_quantized.add_(codes)
             quantized_codes.append(codes)
 
             z = z - codes.detach()
-        
+
+        codebook_losses /= n_elements
+        commitment_losses /= n_elements
+
         if return_code_idx_only:
-            return torch.stack(code_index, dim = 1)
-        
+            return torch.stack(code_index, dim=1)
         else:
-            return final_quantized,code_index, codebook_losses, comitment_losses
+            return final_quantized, code_index, codebook_losses, commitment_losses
+
 
     
     
@@ -64,8 +68,8 @@ class RVQ_VAE(nn.Module):
         final_quantized, code_index, codebook_losses, comitment_losses = self.quantize(latents_flat)
         #final_quantized = final_quantized.reshape(B, T, D)
         #final_quantized = final_quantized.permute(0, 2, 1)
-        
         code_index = code_index[-1].reshape(B, -1)
+
         #decoded = self.forward_dec(final_quantized, skip_connections)
 
         #output = self.gpool(final_quantized).squeeze(-1)

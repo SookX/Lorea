@@ -1,0 +1,7 @@
+model:
+  model_name: "lorea-asr-4" 
+
+training:
+  epochs: 10
+  batch_size: 4
+  learning_rate: 3e-4

@@ -15,6 +15,16 @@ def collate_fn(batch):
     ### Grab Audios from our Batch Dictionary ###
     batch_mels = [sample["input_values"] for sample in batch]
     batch_transcripts = [sample["labels"] for sample in batch]
+    raw_audios = [sample["raw_audio"].squeeze(0).detach().cpu().numpy() for sample in batch]
+     # list of 1D numpy arrays
+    teacher_logits = None
+    try:
+        teacher_logits = [sample["teacher_logits"] for sample in batch]
+    except:
+        pass
+
+   # raw_audios = [a.numpy() for a in batch["raw_audios"]]  # list of 1D numpy arrays
+
 
     ### Get Length of Audios ###
     seq_lens = torch.tensor([b.shape[0] for b in batch_mels], dtype=torch.long)
@@ -30,13 +40,15 @@ def collate_fn(batch):
 
     ### Pack Transcripts (CTC Loss Can Take Packed Targets) ###
     packed_transcripts = torch.cat(batch_transcripts)
-
+    
     ### Create Batch ###
     batch = {"input_values": spectrograms, 
              "seq_lens": seq_lens, 
              "labels": packed_transcripts, 
-             "target_lengths": target_lengths}
-
+             "target_lengths": target_lengths,
+             "raw_audios": raw_audios,
+             "teacher_logits": teacher_logits}
+    
     return batch
 
 

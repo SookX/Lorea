@@ -5,7 +5,51 @@ from torch.utils.data import Dataset
 import torchaudio
 import torchaudio.transforms as T
 import matplotlib.pyplot as plt
+import random
 from transformers import Wav2Vec2CTCTokenizer
+import torchaudio.transforms as AT
+
+import torch
+
+import torch
+import torchaudio
+
+class ConformerSpecAugment(torch.nn.Module):
+    def __init__(self,
+                 time_mask_param=40,
+                 freq_mask_param=30,
+                 num_time_masks=2,
+                 num_freq_masks=2,
+                 time_warp=False,
+                 time_warp_param=80):
+        super().__init__()
+        self.time_mask_param = time_mask_param
+        self.freq_mask_param = freq_mask_param
+        self.num_time_masks = num_time_masks
+        self.num_freq_masks = num_freq_masks
+        self.time_warp = time_warp
+
+        self.time_mask = torchaudio.transforms.TimeMasking(time_mask_param)
+        self.freq_mask = torchaudio.transforms.FrequencyMasking(freq_mask_param)
+        if time_warp:
+            self.time_warp_tf = torchaudio.transforms.TimeStretch()
+
+    def forward(self, spec):
+        out = spec.clone()
+
+        if self.time_warp:
+            out = self.time_warp_tf(out)
+
+        for _ in range(self.num_freq_masks):
+            out = self.freq_mask(out)
+
+        # Apply time masking
+        for _ in range(self.num_time_masks):
+            out = self.time_mask(out)
+
+        return out
+
+
 
 class LibriSpeechDataset(Dataset):
     """
@@ -19,7 +63,10 @@ class LibriSpeechDataset(Dataset):
                  include_splits=["train-clean-100", "train-clean-360", "train-other-500"],
                  sampling_rate=16000,
                  num_audio_channels=1,
-                 tokenizer=None):
+                 tokenizer=None,
+                 train_split = True,
+                 apply_spec_augment=True,
+                 apply_audio_augment=True):
         
         if isinstance(include_splits, str):
             include_splits = [include_splits]
@@ -27,6 +74,11 @@ class LibriSpeechDataset(Dataset):
         self.sampling_rate = sampling_rate
         self.num_audio_channels = num_audio_channels
         self.tokenizer = tokenizer
+        self.teacher_logits_dir = "./teacher_logits"
+        self.train_split = train_split
+        self.apply_spec_augment = apply_spec_augment
+        self.apply_audio_augment= apply_audio_augment
+        self.spec_augment = ConformerSpecAugment()
 
         ### GET PATH TO ALL AUDIO/TEXT FILES ###
         self.librispeech_data = []
@@ -56,47 +108,43 @@ class LibriSpeechDataset(Dataset):
         )
 
         self.amp2db = T.AmplitudeToDB(top_db=80.0)
+        self.time_mask_transform = torchaudio.transforms.TimeMasking(time_mask_param=40)
+        self.freq_mask_transform = torchaudio.transforms.FrequencyMasking(freq_mask_param=30)
+        self.time_warp_transform = torchaudio.transforms.TimeStretch()
+
+        # simple audio augmentations
+        # self.pitch_shift = AT.PitchShift(sample_rate=sampling_rate, n_steps=random.choice([-2, -1, 1, 2]))
+        # self.time_stretch = AT.TimeStretch(n_freq=80)
+        # self.reverb = AT.Vol(1.0)
         
     def __len__(self):
         return len(self.librispeech_data)
     
+
+    
     def __getitem__(self, idx):
-        def ctc_decode(pred_ids):
-            decoded = []
-            prev = None
-            for p in pred_ids:
-                if p != prev and p != self.tokenizer.pad_token_id:
-                    decoded.append(p)
-                prev = p
-            return self.tokenizer.decode(decoded, skip_special_tokens=True)
-
         path_to_audio, transcript = self.librispeech_data[idx]
-
         audio, orig_sr = torchaudio.load(path_to_audio, normalize=True)
         if orig_sr != self.sampling_rate:
             audio = torchaudio.functional.resample(audio, orig_freq=orig_sr, new_freq=self.sampling_rate)
-        
+
+
+
         mel = self.audio2mels(audio)
         mel = self.amp2db(mel)
         mel = (mel - mel.mean()) / (mel.std() + 1e-6)
 
-        # Tokenize text
+        if self.train_split:
+            mel = self.spec_augment(mel)
+
         tokenized_transcript = torch.tensor(self.tokenizer.encode(transcript))
-
-        # Decode without skipping repeated tokens (for inspection)
-        #decoded_transcript = self.tokenizer.decode(tokenized_transcript.tolist(), skip_special_tokens=True)
-
-       # ctc_decoded = ctc_decode(tokenized_transcript.tolist())
-
-       # # Print for debugging
-       # print("Original    :", transcript)
-       # print("Token IDs   :", tokenized_transcript.tolist())
-       # print("Decoded     :", decoded_transcript)
-       # print("CTC Decoded :", ctc_decoded)
-
+        uid = os.path.splitext(os.path.basename(path_to_audio))[0]
+        
         sample = {
-            "input_values": mel[0].T,  # transpose for time-axis
-            "labels": tokenized_transcript
+            "input_values": mel[0].T,
+            "raw_audio": audio,
+            "labels": tokenized_transcript,
+            "uid": uid
         }
         return sample
 

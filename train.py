@@ -17,8 +17,6 @@ class TrainingConfig:
 class Trainer:
     def __init__(self, 
                  student_model,
-                 teacher_model,
-                 teacher_processor,
                  optimizer,
                  scheduler,
                  tokenizer,
@@ -30,8 +28,7 @@ class Trainer:
         #self.teacher_processor = teacher_processor
 
         
-        pytorch_total_params = sum(p.numel() for p in teacher_model.parameters())
-        print(f"Teacher model parameters: {pytorch_total_params}")
+
 
         #for param in self.teacher_model.parameters():
         #    param.requires_grad = False
@@ -77,17 +74,15 @@ class Trainer:
 
         for i in range(B):
             s_len = int(output_lengths[i].item())
-            t_logits = teacher_logits_list[i].to(device)          # (T_t_i, C)
-            s_logits = student_logits[i, :s_len].to(device)      # (T_s_i, C)
+            t_logits = teacher_logits_list[i].to(device)          
+            s_logits = student_logits[i, :s_len].to(device)     
 
-            # interpolate student to teacher length
             s_feat = s_logits.transpose(0, 1).unsqueeze(0)       # (1, C, T_s_i)
             s_interp = F.interpolate(
                 s_feat, size=t_logits.size(0), mode="linear", align_corners=False
             )
             s_interp = s_interp.squeeze(0).transpose(0, 1)       # (T_t_i, C)
 
-            # compute KL divergence per sample
             kd_loss += F.kl_div(
                 F.log_softmax(s_interp / T, dim=-1),
                 F.softmax(t_logits / T, dim=-1),
@@ -160,7 +155,7 @@ class Trainer:
                 lambda1 = 0.5   # weight for conv1 distillation
                 lambda2 = 1.0   # weight for conv2 distillation
                 
-                loss = 3*ctc_loss + lambda1 * distill_loss1 + lambda2 * distill_loss2
+                loss = 3 * ctc_loss + lambda1 * distill_loss1 + lambda2 * distill_loss2
 
 
 

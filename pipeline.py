@@ -38,8 +38,6 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     student_model = Lorea(288, tokenizer.vocab_size).to(device)
 
-    teacher_processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-conformer-rel-pos-large-960h-ft")
-    teacher_model = Wav2Vec2ConformerForCTC.from_pretrained("facebook/wav2vec2-conformer-rel-pos-large-960h-ft").to(device)
 
     #output_dir = "teacher_logits_per_sample"
     #os.makedirs(output_dir, exist_ok=True)
@@ -82,7 +80,7 @@ if __name__ == "__main__":
                                             num_training_steps=EPOCHS * len(train_dataset))
     
     
-    trainer = Trainer(student_model, teacher_model, teacher_processor, optimizer, scheduler, tokenizer, cfg)
+    trainer = Trainer(student_model, optimizer, scheduler, tokenizer, cfg)
     #trainer.evaluate(val_dataloader)
     trainer.forward(train_dataloader, val_dataloader, device)
             

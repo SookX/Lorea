@@ -3,3 +3,8 @@ test-other
 train-clean-100
 train-clean-360
 train-other-500
+*.pt
+__pycache__/
+*.pyc
+.DS_Store
+.pyc

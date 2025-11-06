@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from jiwer import cer, wer
 import os
 from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq
-
+import torch.distributed as dist
 
 @dataclass 
 class TrainingConfig: 
@@ -104,7 +104,7 @@ class Trainer:
         return loss.sum() / mask.sum()
 
 
-    def forward(self, train_dataloader, val_dataloader=None, device="cpu", accum_steps=4):
+    def forward(self, train_dataloader, val_dataloader=None, device="cpu", accum_steps=1):
         
         self.student_model.to(device)
         self.teacher_model.to(device)
@@ -152,26 +152,24 @@ class Trainer:
                     reduction="mean"
                 )
 
-                lambda1 = 0.5   # weight for conv1 distillation
-                lambda2 = 1.0   # weight for conv2 distillation
+                lambda1 = 0.5   
+                lambda2 = 1.0   
                 
                 loss = 3 * ctc_loss + lambda1 * distill_loss1 + lambda2 * distill_loss2
 
 
 
 
-                # Scale loss for gradient accumulation
                 loss = loss / accum_steps
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.student_model.parameters(), max_norm=1.0)
-                running_loss += loss.item() * accum_steps  # scale back for logging
+                running_loss += loss.item() * accum_steps 
 
                 if (step + 1) % accum_steps == 0:
                     self.optimizer.step()
                     self.optimizer.zero_grad(set_to_none=True)
                     self.scheduler.step()
 
-                # Log average loss every 200 steps
                 if (step + 1) % 200 == 0:
                     avg_loss = running_loss / 200
                     tqdm.write(f"[Epoch {epoch+1}, Step {step+1}] Avg Loss: {avg_loss:.4f}")
@@ -179,7 +177,6 @@ class Trainer:
 
                 self.train_losses.append(loss.item() * accum_steps)
 
-            # Validation
             if val_dataloader:
                 val_loss, val_cer, val_wer = self.evaluate(val_dataloader, device)
                 self.val_losses.append(val_loss)
@@ -194,50 +191,58 @@ class Trainer:
                     tqdm.write(f"✅ Saved new best student_model (WER={val_wer:.4f})")
 
     def evaluate(self, dataloader, device="cpu"):
+        is_ddp = dist.is_initialized() if "dist" in globals() else False
+        rank = dist.get_rank() if is_ddp else 0
+    
         self.student_model.eval().to(device)
-        total_loss, total_cer, total_wer = 0.0, 0.0, 0.0
-        num_batches = 0
-
+        total_cer, total_wer = 0.0, 0.0
+        num_examples = 0
+    
         with torch.inference_mode():
             printed_example = False
             for batch in tqdm(dataloader, desc="Validating", leave=False):
                 logits, output_lengths, _, _ = self.student_model(
                     batch["input_values"].to(device),
                     batch["seq_lens"].to(device),
-                    
                 )
-                log_probs = nn.functional.log_softmax(logits, dim=-1).transpose(0,1)
-                ##output_lengths = batch["seq_lens"] // 2
-                #loss = nn.functional.ctc_loss(
-                #    log_probs=log_probs,
-                #    targets=batch["labels"].to(device),
-                #    input_lengths=output_lengths,
-                #    target_lengths=batch["target_lengths"],
-                #    blank=self.tokenizer.pad_token_id,
-                #    reduction="mean"
-                #)
-                #total_loss += loss.item()
-                #num_batches += 1
-#
-                # --- CER computation ---
-                pred_ids = torch.argmax(log_probs, dim=-1).transpose(0,1)  # (B, T)
+                log_probs = nn.functional.log_softmax(logits, dim=-1).transpose(0, 1)
+    
+                pred_ids = torch.argmax(log_probs, dim=-1).transpose(0, 1)
                 start_idx = 0
                 for i, pred in enumerate(pred_ids):
                     target_len = batch["target_lengths"][i]
                     target_seq = batch["labels"][start_idx:start_idx + target_len]
-                    start_idx += target_len   
-                    pred_str = self.tokenizer.decode(pred.tolist(), skip_special_tokens=False)
-                    target_str = self.tokenizer.decode(target_seq.tolist(), skip_special_tokens=False)
-                    if not printed_example:
+                    start_idx += target_len
+    
+                    pred_str = self.tokenizer.decode(pred.tolist(), skip_special_tokens=True)
+                    target_str = self.tokenizer.decode(target_seq.tolist(), skip_special_tokens=True)
+    
+                    if rank == 0 and not printed_example:
                         print(f"Target  : {target_str}")
                         print(f"Pred    : {pred_str}")
                         printed_example = True
+    
                     total_cer += cer(target_str, pred_str)
                     total_wer += wer(target_str, pred_str)
-
-        avg_loss = total_loss / num_batches if num_batches > 0 else float("inf")
-        avg_cer = total_cer / len(dataloader.dataset) if len(dataloader.dataset) > 0 else float("inf")
-        avg_wer = total_wer/ len(dataloader.dataset) if len(dataloader.dataset) > 0 else float("inf")
-
+                    num_examples += 1
+    
+        if is_ddp:
+            total_cer_tensor = torch.tensor(total_cer, device=device)
+            total_wer_tensor = torch.tensor(total_wer, device=device)
+            num_examples_tensor = torch.tensor(num_examples, device=device)
+    
+            dist.all_reduce(total_cer_tensor, op=dist.ReduceOp.SUM)
+            dist.all_reduce(total_wer_tensor, op=dist.ReduceOp.SUM)
+            dist.all_reduce(num_examples_tensor, op=dist.ReduceOp.SUM)
+    
+            total_cer = total_cer_tensor.item()
+            total_wer = total_wer_tensor.item()
+            num_examples = num_examples_tensor.item()
+    
+        avg_cer = total_cer / num_examples if num_examples > 0 else float("inf")
+        avg_wer = total_wer / num_examples if num_examples > 0 else float("inf")
+        avg_loss = float("nan")  
+    
         self.student_model.train()
         return avg_loss, avg_cer, avg_wer
+

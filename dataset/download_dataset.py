@@ -1,16 +1,13 @@
 import os
 import requests
 import tarfile
-from tqdm import tqdm  # install via `pip install tqdm`
+from tqdm import tqdm
 
-# ---------------------------------------------------------------------
-# CONFIG
-# ---------------------------------------------------------------------
+
 
 target_folder = "datasets/librispeech"
 os.makedirs(target_folder, exist_ok=True)
 
-# direct OpenSLR base URL
 base_url = "http://www.openslr.org/resources/12"
 
 files = {
@@ -21,9 +18,6 @@ files = {
     "test-clean.tar.gz":       f"{base_url}/test-clean.tar.gz",
 }
 
-# ---------------------------------------------------------------------
-# FUNCTION to download with progress bar
-# ---------------------------------------------------------------------
 
 def download_url(url, destination, chunk_size=32768):
     # Get stream
@@ -42,10 +36,6 @@ def download_url(url, destination, chunk_size=32768):
             if chunk:
                 f.write(chunk)
                 bar.update(len(chunk))
-
-# ---------------------------------------------------------------------
-# DOWNLOAD + EXTRACT
-# ---------------------------------------------------------------------
 
 print("🔥 Starting dataset download...")
 

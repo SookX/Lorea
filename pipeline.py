@@ -43,13 +43,13 @@ def main():
 
     train_dataset = LibriSpeechDataset(
         "./dataset/datasets/librispeech/LibriSpeech",
-        include_splits=["train-clean-100", "train-clean-360"],
+        include_splits=["train-clean-100", "train-clean-360", "train-other-500"],
         tokenizer=tokenizer
     )
 
     val_dataset = LibriSpeechDataset(
         "./dataset/datasets/librispeech/LibriSpeech",
-        include_splits=["test-clean"],
+        include_splits=["dev-clean"],
         tokenizer=tokenizer,
         train_split=False,
     )
@@ -96,6 +96,7 @@ def main():
 
     try:
         trainer.forward(train_dataloader, val_dataloader, device)
+        #trainer.evaluate(val_dataloader)
     finally:
         if use_ddp and dist.is_initialized():
             dist.barrier()
